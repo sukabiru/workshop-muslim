@@ -87,30 +87,58 @@
   </div>
 
   <script>
-    const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxWcXcueOP2CsWhTKVQ7A-s3qPqenWhneSqBio8jVVua3SVu9yLV-DpsXJAibdssmbl/exec';
+    const SHEET_URL = 'https://script.google.com/macros/s/AKfycbycOtmB47CMakqfM-3ZeGUNJYbIYk67CP6q4cC3MiM81eljt-1xuDCKginjvjjzm2FH/exec';
     async function loadData() {
-      const tbody = document.querySelector('#table tbody');
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Memuat data...</td></tr>';
-      try {
-        const res = await fetch(SHEET_URL);
-        const data = await res.json();
-        if (!data.length) {
-          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Belum ada data</td></tr>';
-          return;
-        }
-        tbody.innerHTML = data.map(r => `
-          <tr>
-            <td>${new Date(r.waktu).toLocaleString('id-ID')}</td>
-            <td>${r.nama}</td>
-            <td>${r.hp}</td>
-            <td>${r.alamat}</td>
-          </tr>
-        `).join('');
-      } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:red;">Gagal memuat data</td></tr>`;
-      }
+  const tbody = document.querySelector('#table tbody');
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Memuat data...</td></tr>';
+  try {
+    const res = await fetch(SHEET_URL);
+    // jika status bukan OK, throw
+    if (!res.ok) throw new Error('HTTP error ' + res.status);
+
+    const text = await res.text();
+    if (!text) throw new Error('Empty response');
+
+    // some deployments may return plain text 'Success' on POST; we expect JSON here
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      throw new Error('Response bukan JSON: ' + text.substring(0,200));
     }
-    loadData();
+
+    // normalize: if returned array, wrap into { peserta: array }
+    const list = Array.isArray(parsed) ? parsed : (parsed.peserta || parsed || []);
+    if (!list || !list.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Belum ada data</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = list.map(r => {
+      // beberapa r.waktu mungkin adalah objek Date string atau serial
+      let waktuDisplay = r.waktu || r.timestamp || '';
+      try {
+        waktuDisplay = new Date(waktuDisplay).toLocaleString('id-ID');
+      } catch (e) { /* keep original */ }
+      return `
+        <tr>
+          <td>${waktuDisplay}</td>
+          <td>${escapeHtml(r.nama || '')}</td>
+          <td>${escapeHtml(r.hp || '')}</td>
+          <td>${escapeHtml(r.alamat || '')}</td>
+        </tr>
+      `;
+    }).join('');
+
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:red;">Gagal memuat data: ${escapeHtml(err.message)}</td></tr>`;
+    console.error(err);
+  }
+}
+
+// small escape util
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
+
   </script>
 </body>
 </html>
