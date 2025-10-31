@@ -163,11 +163,15 @@
       data.append('alamat', alamat);
 
       try {
-        await fetch('https://script.google.com/macros/s/AKfycbxWcXcueOP2CsWhTKVQ7A-s3qPqenWhneSqBio8jVVua3SVu9yLV-DpsXJAibdssmbl/exec', {
-          method: 'POST',
-          mode: 'no-cors',
-          body: data
-        });
+       await fetch('https://script.google.com/macros/s/AKfycbxWcXcueOP2CsWhTKVQ7A-s3qPqenWhneSqBio8jVVua3SVu9yLV-DpsXJAibdssmbl/exec', {
+  method: 'POST',
+  body: new URLSearchParams({
+    nama,
+    hp,
+    alamat
+  })
+});
+
 
         form.reset();
         showPopup();
