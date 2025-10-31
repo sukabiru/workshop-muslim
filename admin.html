@@ -20,7 +20,7 @@
       padding: 0;
     }
     .wrap {
-      max-width: 920px;
+      max-width: 960px;
       margin: 40px auto;
       padding: 20px;
     }
@@ -52,8 +52,15 @@
     tr:hover td {
       background: #f7fff9;
     }
-    .reload-btn {
-      display: inline-block;
+    .actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    button {
       background: var(--green);
       color: white;
       border: none;
@@ -61,7 +68,9 @@
       padding: 8px 16px;
       font-weight: bold;
       cursor: pointer;
-      margin-bottom: 16px;
+    }
+    button:hover {
+      background: var(--green-dark);
     }
     footer {
       text-align: center;
@@ -69,76 +78,142 @@
       color: #2d6b4a;
       margin-top: 20px;
     }
+    #loginBox {
+      max-width: 320px;
+      margin: 120px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    #loginBox h2 { text-align: center; color: var(--green-dark); }
+    #loginBox input {
+      width: 100%; padding: 8px; margin-top: 10px;
+      border: 1px solid #ccc; border-radius: 5px;
+    }
+    #loginBox button {
+      width: 100%; margin-top: 12px;
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Data Pendaftar Workshop</h1>
-    <button class="reload-btn" onclick="loadData()">🔄 Muat Ulang</button>
-    <table id="table">
-      <thead>
-        <tr><th>Waktu</th><th>Nama</th><th>No. HP</th><th>Alamat</th></tr>
-      </thead>
-      <tbody>
-        <tr><td colspan="4" style="text-align:center;">Memuat data...</td></tr>
-      </tbody>
-    </table>
-    <footer>MT Al Kahfi 512 • Data Pendaftar Workshop</footer>
+
+<div id="loginBox" style="display:none;">
+  <h2>Admin Login</h2>
+  <input id="adminPass" type="password" placeholder="Masukkan password" />
+  <button onclick="checkLogin()">Login</button>
+  <p id="loginError" style="color:red;text-align:center;"></p>
+</div>
+
+<div class="wrap" id="adminPanel" style="display:none;">
+  <h1>Data Pendaftar Workshop</h1>
+  <div class="actions">
+    <div>
+      <button onclick="loadData()">🔄 Muat Ulang</button>
+      <button onclick="exportCSV()">📤 Ekspor CSV</button>
+    </div>
+    <small>Auto-refresh setiap 1 menit ⏱️</small>
   </div>
+  <table id="table">
+    <thead>
+      <tr><th>Waktu</th><th>Nama</th><th>No. HP</th><th>Alamat</th></tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="4" style="text-align:center;">Memuat data...</td></tr>
+    </tbody>
+  </table>
+  <footer>MT Al Kahfi 512 • Data Pendaftar Workshop</footer>
+</div>
 
-  <script>
-    const SHEET_URL = 'https://script.google.com/macros/s/AKfycbycOtmB47CMakqfM-3ZeGUNJYbIYk67CP6q4cC3MiM81eljt-1xuDCKginjvjjzm2FH/exec';
-    async function loadData() {
-  const tbody = document.querySelector('#table tbody');
-  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Memuat data...</td></tr>';
-  try {
-    const res = await fetch(SHEET_URL);
-    // jika status bukan OK, throw
-    if (!res.ok) throw new Error('HTTP error ' + res.status);
+<script>
+  const SHEET_URL = 'https://script.google.com/macros/s/AKfycbycOtmB47CMakqfM-3ZeGUNJYbIYk67CP6q4cC3MiM81eljt-1xuDCKginjvjjzm2FH/exec';
+  const ADMIN_PASS = '512kahfi'; // 🔒 ubah sesuai keinginanmu
 
-    const text = await res.text();
-    if (!text) throw new Error('Empty response');
-
-    // some deployments may return plain text 'Success' on POST; we expect JSON here
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch (e) {
-      throw new Error('Response bukan JSON: ' + text.substring(0,200));
+  // Proteksi admin
+  function checkLogin() {
+    const pass = document.getElementById('adminPass').value.trim();
+    if (pass === ADMIN_PASS) {
+      localStorage.setItem('workshopAdmin', 'true');
+      document.getElementById('loginBox').style.display = 'none';
+      document.getElementById('adminPanel').style.display = 'block';
+      loadData();
+    } else {
+      document.getElementById('loginError').textContent = 'Password salah!';
     }
-
-    // normalize: if returned array, wrap into { peserta: array }
-    const list = Array.isArray(parsed) ? parsed : (parsed.peserta || parsed || []);
-    if (!list || !list.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Belum ada data</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = list.map(r => {
-      // beberapa r.waktu mungkin adalah objek Date string atau serial
-      let waktuDisplay = r.waktu || r.timestamp || '';
-      try {
-        waktuDisplay = new Date(waktuDisplay).toLocaleString('id-ID');
-      } catch (e) { /* keep original */ }
-      return `
-        <tr>
-          <td>${waktuDisplay}</td>
-          <td>${escapeHtml(r.nama || '')}</td>
-          <td>${escapeHtml(r.hp || '')}</td>
-          <td>${escapeHtml(r.alamat || '')}</td>
-        </tr>
-      `;
-    }).join('');
-
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:red;">Gagal memuat data: ${escapeHtml(err.message)}</td></tr>`;
-    console.error(err);
   }
-}
 
-// small escape util
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
+  function checkAccess() {
+    if (localStorage.getItem('workshopAdmin') === 'true') {
+      document.getElementById('loginBox').style.display = 'none';
+      document.getElementById('adminPanel').style.display = 'block';
+      loadData();
+    } else {
+      document.getElementById('loginBox').style.display = 'block';
+    }
+  }
 
-  </script>
+  // Load data dari Google Sheet
+  async function loadData() {
+    const tbody = document.querySelector('#table tbody');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Memuat data...</td></tr>';
+    try {
+      const res = await fetch(SHEET_URL);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      const parsed = JSON.parse(text);
+      const list = Array.isArray(parsed) ? parsed : (parsed.peserta || []);
+
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Belum ada data</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map(r => {
+        let waktuDisplay = r.waktu || '';
+        try { waktuDisplay = new Date(waktuDisplay).toLocaleString('id-ID'); } catch {}
+        return `
+          <tr>
+            <td>${waktuDisplay}</td>
+            <td>${escapeHtml(r.nama || '')}</td>
+            <td>${escapeHtml(r.hp || '')}</td>
+            <td>${escapeHtml(r.alamat || '')}</td>
+          </tr>
+        `;
+      }).join('');
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:red;">Gagal memuat data: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  // Auto refresh setiap 60 detik
+  setInterval(() => {
+    if (document.getElementById('adminPanel').style.display !== 'none') {
+      loadData();
+    }
+  }, 60000);
+
+  // Ekspor ke CSV
+  function exportCSV() {
+    const rows = [['Waktu','Nama','No. HP','Alamat']];
+    document.querySelectorAll('#table tbody tr').forEach(tr => {
+      const cols = [...tr.children].map(td => td.textContent.trim());
+      if (cols.length === 4) rows.push(cols);
+    });
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `data-pendaftar-${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
+  }
+
+  // Inisialisasi halaman
+  checkAccess();
+</script>
+
 </body>
 </html>
