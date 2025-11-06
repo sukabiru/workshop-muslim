@@ -116,20 +116,19 @@
   </div>
   <table id="table">
     <thead>
-      <tr><th>No</th><th>Waktu</th><th>Nama</th><th>No. HP</th><th>Alamat</th></tr>
+      <tr><th>No</th><th>Waktu</th><th>Nama</th><th>No. HP</th><th>Alamat</th><th>Aksi</th></tr>
     </thead>
     <tbody>
-      <tr><td colspan="5" style="text-align:center;">Memuat data...</td></tr>
+      <tr><td colspan="6" style="text-align:center;">Memuat data...</td></tr>
     </tbody>
   </table>
   <footer>MT Al Kahfi 512 • Data Pendaftar Workshop</footer>
 </div>
 
 <script>
-  const SHEET_URL = 'https://script.google.com/macros/s/AKfycbycOtmB47CMakqfM-3ZeGUNJYbIYk67CP6q4cC3MiM81eljt-1xuDCKginjvjjzm2FH/exec';
-  const ADMIN_PASS = '512kahfi'; // 🔒 ubah sesuai keinginanmu
+  const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxoiBVUQKIaJ2gSDK1bk2-SjorCdtOT1RRp9mKLSK54RHZT4A4SMU4xmQuFchKIX6ry/exec';
+  const ADMIN_PASS = '512kahfi'; // 🔒 ubah sesuai kebutuhan
 
-  // Proteksi admin
   function checkLogin() {
     const pass = document.getElementById('adminPass').value.trim();
     if (pass === ADMIN_PASS) {
@@ -152,10 +151,9 @@
     }
   }
 
-  // Load data dari Google Sheet
   async function loadData() {
     const tbody = document.querySelector('#table tbody');
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Memuat data...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Memuat data...</td></tr>';
     try {
       const res = await fetch(SHEET_URL);
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -164,7 +162,7 @@
       const list = Array.isArray(parsed) ? parsed : (parsed.peserta || []);
 
       if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Belum ada data</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Belum ada data</td></tr>';
         return;
       }
 
@@ -178,27 +176,46 @@
             <td>${escapeHtml(r.nama || '')}</td>
             <td>${escapeHtml(r.hp || '')}</td>
             <td>${escapeHtml(r.alamat || '')}</td>
+            <td><button onclick="hapusData(${i})">🗑️ Hapus</button></td>
           </tr>
         `;
       }).join('');
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:red;">Gagal memuat data: ${escapeHtml(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:red;">Gagal memuat data: ${escapeHtml(err.message)}</td></tr>`;
     }
   }
 
-  // Auto refresh setiap 60 detik
-  setInterval(() => {
-    if (document.getElementById('adminPanel').style.display !== 'none') {
-      loadData();
+  // ✅ fungsi hapus aman, tanpa preflight
+  async function hapusData(index) {
+    if (!confirm("Yakin ingin menghapus data ini?")) return;
+    try {
+      const res = await fetch(SHEET_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'delete', index: String(index) })
+      });
+      const json = await res.json();
+      if (json && json.success) {
+        alert('✅ Data berhasil dihapus');
+        loadData();
+      } else {
+        alert('❌ Gagal menghapus: ' + (json && json.message ? json.message : 'Unknown'));
+      }
+    } catch (err) {
+      alert('❌ Error saat menghapus: ' + err.message);
+      console.error(err);
     }
+  }
+
+  setInterval(() => {
+    if (document.getElementById('adminPanel').style.display !== 'none') loadData();
   }, 60000);
 
-  // Ekspor ke CSV
   function exportCSV() {
     const rows = [['No','Waktu','Nama','No. HP','Alamat']];
     document.querySelectorAll('#table tbody tr').forEach(tr => {
       const cols = [...tr.children].map(td => td.textContent.trim());
-      if (cols.length === 5) rows.push(cols);
+      if (cols.length >= 5) rows.push(cols.slice(0,5));
     });
     const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
     const blob = new Blob([csv], {type:'text/csv'});
@@ -212,7 +229,6 @@
     return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
   }
 
-  // Inisialisasi halaman
   checkAccess();
 </script>
 
